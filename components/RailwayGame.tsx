@@ -28,7 +28,11 @@ import {
   redo,
   type History,
 } from "@/lib/railway/editor";
-import { createTrain, revalidateStart } from "@/lib/railway/simulation";
+import {
+  createTrain,
+  revalidateStart,
+  reconcileTrain,
+} from "@/lib/railway/simulation";
 import { decodeSave, encodeSave, SAVE_KEY } from "@/lib/railway/persistence";
 import { changeSwitchRoute, switchOccupied } from "@/lib/railway/switches";
 import { RailwayAudio } from "@/lib/audio";
@@ -195,9 +199,19 @@ export default function RailwayGame() {
     setTrainStatus(state);
   };
   const resetForTracks = (next: Track[]) => {
+    const kept = reconcileTrain(trainRef.current, tracks, next);
     const valid = revalidateStart(start, next);
-    setStart(valid);
-    updateTrain(valid ? createTrain(valid) : null);
+    setStart(
+      kept
+        ? valid || {
+            pieceId: kept.pieceId,
+            pathId: kept.pathId,
+            distance: kept.distance,
+            direction: kept.direction,
+          }
+        : null,
+    );
+    updateTrain(kept);
   };
   const edit = (next: Track[]) => {
     setHistory((h) => commit(h, next));
@@ -342,6 +356,7 @@ export default function RailwayGame() {
     updateTrain({
       ...trainRef.current,
       running: true,
+      stopReason: undefined,
       targetSpeed: speed,
       lapLength: length,
     });
@@ -370,6 +385,7 @@ export default function RailwayGame() {
     updateTrain({
       ...trainRef.current,
       direction: trainRef.current.direction === 1 ? -1 : 1,
+      stopReason: undefined,
       speed: 0,
     });
     setFeedback("This way to a new adventure!");
@@ -617,11 +633,20 @@ export default function RailwayGame() {
                 onMove={move}
                 onTrainPlace={placeTrain}
                 onSimulation={onSimulation}
-                onEnded={() =>
-                  setFeedback(
-                    "End of the line! Add more track or reverse your engine.",
-                  )
-                }
+                onEnded={(reason) => {
+                  if (reason === "invalid") {
+                    updateTrain(null);
+                    setStart(null);
+                    setFeedback(
+                      "The track changed. Place your engine on a valid track.",
+                    );
+                  } else {
+                    audio.current?.brake();
+                    setFeedback(
+                      "End of the track! Add more pieces to keep going!",
+                    );
+                  }
+                }}
                 onWheelSound={() => audio.current?.wheel()}
                 onRotate={rotate}
                 onDelete={remove}

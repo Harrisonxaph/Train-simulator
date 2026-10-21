@@ -51,7 +51,7 @@ type Props = {
   onMove: (track: Track) => void;
   onTrainPlace: (track: Track, pathId?: PathId) => void;
   onSimulation: (state: TrainState | null) => void;
-  onEnded: () => void;
+  onEnded: (reason?: TrainState["stopReason"]) => void;
   onWheelSound: () => void;
   onRotate: () => void;
   onDelete: () => void;
@@ -369,7 +369,7 @@ export const RailwayBoard = forwardRef<BoardHandle, Props>(
         if (before?.running) {
           const next = advanceTrain(before, p.tracks, p.network, dt);
           p.trainRef.current = next;
-          if (!next.running) p.onEnded();
+          if (!next.running) p.onEnded(next.stopReason);
           if (now - lastWheel > 360) {
             lastWheel = now;
             p.onWheelSound();

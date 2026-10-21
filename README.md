@@ -31,7 +31,7 @@ New players start with an empty grassy board and no locomotive. Build some track
 - **Pan:** drag the view. Zoom with the +/− buttons or mouse wheel. Fit shows the whole 20 × 20 board. Holding Shift or using the middle mouse button also pans.
 - **Undo / Redo:** recover up to 50 construction actions. New clears the board after confirmation; Undo can restore it. The sparkle button loads the sample railway, and Undo can restore the previous layout.
 - **Drive:** choose the steam, diesel or electric engine and tap any track to place it. Only one locomotive runs at a time. Construction tools are locked in Drive mode.
-- **Play / Pause:** start or freeze the train. On phones, a fixed quick-control bar keeps Play/Pause, Stop and Horn reachable while viewing the board. **Stop / Reset** return it to its saved starting point. **Reverse** works while paused. Slow, Normal and Fast change its target speed. Open tracks are allowed: the train stops at the end.
+- **Play / Pause:** start or freeze the train. On phones, a fixed quick-control bar keeps Play/Pause, Stop and Horn reachable while viewing the board. **Stop / Reset** return it to its saved starting point. **Reverse** works while paused. Slow, Normal and Fast change its target speed. Open tracks are allowed: the train brakes and stops at the end, with a gentle cue and subtle endpoint marker. Reverse returns along the same route. Switch to Build and extend the railway; editing other pieces preserves the paused engine’s position so Play can continue forward. Changing or removing its occupied geometry clears placement safely.
 - **Horn:** each engine has an original synthesised sound. The top speaker button mutes sound and remembers your preference. There is no background music.
 - **Save / Load:** use the disk and folder buttons. Valid layouts also save automatically after 600 ms without a change. Save data belongs to this browser and origin; clearing browser storage removes it. Load restores the current saved snapshot, not a separate backup slot.
 
@@ -74,8 +74,8 @@ In restricted environments, set `PLAYWRIGHT_BROWSERS_PATH` to a writable directo
 
 ## Verified in this workspace
 
-- **110/110 Vitest tests pass.**
-- **42 Playwright checks pass** against the production build in desktop and phone-sized Chromium. Two phone-only checks (quick controls and touch palette swiping) intentionally skip the desktop project.
+- **127/127 Vitest tests pass.**
+- **44 Playwright checks pass** against the production build in desktop and phone-sized Chromium. Two phone-only checks (quick controls and touch palette swiping) intentionally skip the desktop project.
 - TypeScript checking and `next build` pass.
 - Browser acceptance covers creating an oval, detecting its loop, placing an engine, completing a lap, pausing, resetting, editing and saving. The pure simulator test continues for at least six laps.
 - V1 sample-animation QA observed approximately 60 frames/second in headless Chromium. V1.1 desktop/phone visual checks reported no runtime errors or horizontal page overflow; this is not a physical-device benchmark.
