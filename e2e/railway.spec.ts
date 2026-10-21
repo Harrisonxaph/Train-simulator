@@ -1,11 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
-async function ready(page: Page) {
+async function ready(page: Page, sample = true) {
   await page.goto("/");
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
   const skip = page.getByRole("button", { name: "Skip tour" });
   if (await skip.isVisible()) await skip.click();
+  if (sample)
+    await page
+      .getByRole("button", { name: "Sample railway", exact: true })
+      .click();
 }
 async function cell(page: Page, x: number, y: number) {
   const c = page.getByRole("application", {
@@ -108,8 +112,8 @@ test("recovers corrupt saves without overwriting them", async ({ page }) => {
   await page.addInitScript(() =>
     localStorage.setItem("little-railways-v1", "broken"),
   );
-  await ready(page);
-  await expect(page.getByTestId("piece-count")).not.toHaveText("0");
+  await ready(page, false);
+  await expect(page.getByTestId("piece-count")).toHaveText("0");
   await expect(page.getByRole("status")).toContainText("saved railway");
   await page.waitForTimeout(900);
   expect(

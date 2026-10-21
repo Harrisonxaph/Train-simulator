@@ -1,6 +1,6 @@
 # Little Railways — My Train Set
 
-A playable, browser-local miniature railway sandbox. Build a railway from straight and curved tracks, place an original locomotive, and watch it follow the railway you actually made.
+A playable, browser-local miniature railway sandbox. Build a railway from straight, curved, crossing and switching tracks, place an original locomotive, and watch it follow the railway you actually made.
 
 ## Run locally
 
@@ -22,10 +22,12 @@ npm start
 
 ## Play
 
-New players start with the **Meadow Loop**, a complete 32-piece oval and a steam engine. Press the green **Let’s go!** button to drive immediately.
+New players start with an empty grassy board and no locomotive. Build some track, choose an engine, place it on the railway, then press **Play**. The **Sample railway** button still loads the complete Meadow Loop and steam engine when you want an immediate ride. Existing valid saved railways load automatically.
 
-- **Build:** choose Straight or Curve, then tap a grassy square or drag from the building box. Pieces snap to exact grid positions; green endpoint highlights confirm compatible connections. Rotate changes the next piece’s orientation.
+- **Build:** choose Straight, Curve, Crossing, Left switch or Right switch, then tap a grassy square or drag from the building box. Pieces snap to exact grid positions; green endpoint highlights confirm compatible connections. Rotate changes the next piece’s orientation.
 - **Select:** tap a piece to select it, drag to move it, or use Rotate and Remove. Invalid drops and drops outside the board leave the railway unchanged.
+- **Crossings:** the horizontal and vertical rails are independent. Trains travel straight across; they never turn onto the intersecting line. When placing an engine directly on a crossing, tap near the desired rail or choose its route in Place by grid.
+- **Switches:** left and right switches occupy two cells. Select one or use **Switch to control**, then choose **Straight** or **Branch**. Only the aligned route is traversable, including reverse entry. Controls remain available in Drive mode, but a switch cannot change while the engine or its overhang occupies it.
 - **Pan:** drag the view. Zoom with the +/− buttons or mouse wheel. Fit shows the whole 20 × 20 board. Holding Shift or using the middle mouse button also pans.
 - **Undo / Redo:** recover up to 50 construction actions. New clears the board after confirmation; Undo can restore it. The sparkle button loads the sample railway, and Undo can restore the previous layout.
 - **Drive:** choose the steam, diesel or electric engine and tap any track to place it. Only one locomotive runs at a time. Construction tools are locked in Drive mode.
@@ -42,7 +44,7 @@ Controls have accessible names and visible focus rings. Expand **Place by grid**
 **Milestones 1 and 2 are implemented**, with selected Milestone 3 features:
 
 - Canvas board with separate world/screen coordinates, responsive camera, mouse/touch/pen pointer events, valid/invalid ghosts and endpoint feedback.
-- Straight and circular quarter-curve tracks in every rotation; occupied cells and board bounds are enforced.
+- Straight, circular quarter-curve and independent crossing paths, plus two-cell left/right switches in every rotation; full footprints enforce occupied cells and board bounds.
 - Explicit endpoint positions and outward tangents; compatible endpoint graph, connected components, open ends and complete loop detection.
 - Distance-based, frame-rate-independent train traversal along actual constructed geometry, smooth tangent headings, overshoot between segments, safe end stops and repeated loop laps.
 - Three original locomotive designs, steam smoke, transport controls and synthesised feedback.
@@ -72,11 +74,11 @@ In restricted environments, set `PLAYWRIGHT_BROWSERS_PATH` to a writable directo
 
 ## Verified in this workspace
 
-- **49/49 Vitest tests pass.**
-- **23 Playwright checks pass** against the production build across desktop and phone-sized Chromium; the phone-only quick-control check is intentionally skipped in the desktop project (1 skip).
+- **110/110 Vitest tests pass.**
+- **42 Playwright checks pass** against the production build in desktop and phone-sized Chromium. Two phone-only checks (quick controls and touch palette swiping) intentionally skip the desktop project.
 - TypeScript checking and `next build` pass.
 - Browser acceptance covers creating an oval, detecting its loop, placing an engine, completing a lap, pausing, resetting, editing and saving. The pure simulator test continues for at least six laps.
-- Sample-animation QA observed approximately 60 frames/second with no runtime errors or horizontal overflow in both tested viewport sizes. This is a headless-browser measurement, not a physical-device benchmark.
+- V1 sample-animation QA observed approximately 60 frames/second in headless Chromium. V1.1 desktop/phone visual checks reported no runtime errors or horizontal page overflow; this is not a physical-device benchmark.
 - Both review findings in `docs/review.md` were reproduced failing before the fixes and pass in the final browser suite.
 
 ## Architecture
@@ -86,7 +88,8 @@ In restricted environments, set `PLAYWRIGHT_BROWSERS_PATH` to a writable directo
 | `lib/railway/types.ts` | Shared tracks, endpoints, graph, train and save types |
 | `geometry.ts` | Quarter-turn transforms, endpoints and distance-to-pose sampling |
 | `network.ts` | Position/tangent matching and component/loop analysis |
-| `editor.ts` | Placement constraints and immutable undo/redo |
+| `editor.ts`, `footprints.ts` | Multi-cell placement constraints and immutable undo/redo |
+| `switches.ts` | Live switch occupancy and safe route changes |
 | `simulation.ts` | Pure delta-time integration and graph traversal |
 | `persistence.ts` | Versioned, bounded save validation |
 | `sample.ts` | Connected sample oval |
@@ -95,9 +98,9 @@ In restricted environments, set `PLAYWRIGHT_BROWSERS_PATH` to a writable directo
 | `BuildingBox.tsx`, `ConductorPanel.tsx` | Accessible construction and driving controls |
 | `lib/rendering.ts`, `lib/audio.ts` | Original procedural visuals and sounds |
 
-World units equal one grid cell. A straight is one unit long; a curve has radius 0.5 and length π/4. Endpoints connect only at equal positions (tolerance 10⁻⁶) with opposing tangents. The graph is rebuilt after track changes, never each animation frame. Simulation consumes remaining distance across linked segments and derives heading from each path’s tangent. Large display-time gaps are capped at the animation boundary; tab visibility resets its timestamp.
+World units equal one grid cell. A straight is one unit long; a curve has radius 0.5 and length π/4. Endpoints connect only at equal positions (tolerance 10⁻⁶) with opposing tangents. Crossings contain two independent paths. Switches have a length-2 straight path and a length-1 + π/4 branch (straight approach followed by a radius-0.5 arc). The graph distinguishes physical ports from active traversal paths and is rebuilt after track or alignment changes, never each animation frame. Simulation consumes remaining distance across linked segments and derives heading from each path’s tangent. Large display-time gaps are capped at the animation boundary; tab visibility resets its timestamp.
 
-Save version 1 validates every field, track ID, rotation, coordinate, occupied cell and starting position. Invalid loads preserve the current board. A corrupt saved record encountered on startup or manual Load is preserved and autosaving disabled until an explicit Save, sample load or new board action replaces it. Storage failure leaves the game playable and reports the saving limitation.
+Save version 2 validates every field, track ID, rotation, multi-cell footprint, active path and starting distance, and persists switch alignment. Version 1 saves migrate in memory without discarding user progress. Saves explicitly marked as automatically generated demo data start empty while preserving the original record until an explicit Save, sample or New action. Unmarked legacy layouts are preserved because their provenance cannot be determined safely. Invalid loads preserve the current board. A corrupt saved record encountered on startup or manual Load is preserved and autosaving disabled until an explicit Save, sample load or new board action replaces it. Storage failure leaves the game playable and reports the saving limitation.
 
 ## Deploy to Vercel
 
@@ -105,13 +108,13 @@ Save version 1 validates every field, track ID, rotation, coordinate, occupied c
 2. Select the **Next.js** framework preset. Use `npm ci` to install and `npm run build` to build. Keep the default Next.js output directory.
 3. Choose a supported Node.js version (22 or 24), then deploy. There are no environment variables, database migrations or external service credentials.
 
-The result can use Vercel’s free tier subject to its terms. Saving remains local to each visitor’s browser. The project has not been published by this build session.
+The result can use Vercel’s free tier subject to its terms. Saving remains local to each visitor’s browser. V1.1 is delivered on a feature branch for review; merging into the production branch can trigger the existing Vercel Git deployment.
 
 ## Genuinely outstanding
 
-The approved first release deliberately defers Milestone 4: two-cell long straights, station track/platform and station building, placeable scenery, switch junctions and their controls, three railway challenge badges, additional trains/carriages and train-to-train collision avoidance. Consequently, the sample oval has no station yet. Advanced magnetic auto-rotation is also absent: snapping preserves the orientation the player chooses.
+The approved first release deliberately defers Milestone 4: two-cell long straights, station track/platform and station building, placeable scenery, three railway challenge badges, additional trains/carriages and train-to-train collision avoidance. Consequently, the sample oval has no station yet. Advanced magnetic auto-rotation is also absent: snapping preserves the orientation the player chooses.
 
-For the next update, implement multi-cell footprints and station/long-track geometry first, then add junction paths with a tested active-route model and switch occupancy locks. Add challenges once lap events and user-built completion rules have a persistent progression model. Test physical iPhones/iPads with Safari and add pinch-to-zoom and optional offline/PWA installation before expanding the world.
+For a future update, add station and long-track geometry using the existing multi-cell footprints. Add challenges once lap events and user-built completion rules have a persistent progression model. Test physical iPhones/iPads with Safari and add pinch-to-zoom and optional offline/PWA installation before expanding the world.
 
 ## Coding agents
 

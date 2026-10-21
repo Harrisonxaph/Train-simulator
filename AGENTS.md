@@ -6,9 +6,9 @@ This file guides coding agents working anywhere in this repository. Read `README
 
 Little Railways — My Train Set is a child-friendly, bird’s-eye railway construction game. A player builds tracks and runs a locomotive along the actual connected geometry. Preserve the working Milestones 1 and 2 release and its selected polish features.
 
-Implemented: straight/quarter-curve tracks, a 20 × 20 board, pointer and keyboard placement, grid snapping and endpoint feedback, movement/rotation/deletion, 50-action undo/redo, explicit connectivity and loop detection, three locomotive designs, one running train, transport controls, sample oval, tutorial, synthesised audio and validated LocalStorage saves.
+Implemented: straight/quarter-curve/crossing tracks and two-cell left/right switches, a 20 × 20 board, pointer and keyboard placement, grid snapping and endpoint feedback, movement/rotation/deletion, 50-action undo/redo, explicit connectivity and loop detection, three locomotive designs, one running train, transport controls, sample oval, tutorial, synthesised audio and validated LocalStorage saves.
 
-Deferred: long multi-cell tracks, station tracks, junctions/switches, placeable scenery, challenges, additional trains/carriages and train-to-train collisions. Ambient trees and pond artwork are decorative. Do not present deferred features as complete or add nonfunctional controls.
+Deferred: long multi-cell tracks, station tracks, placeable scenery, challenges, additional trains/carriages and train-to-train collisions. Ambient trees and pond artwork are decorative. Do not present deferred features as complete or add nonfunctional controls.
 
 ## Stack and commands
 
@@ -50,8 +50,10 @@ Do not run `next dev` and `next build` concurrently against the same `.next` dir
 - Keep gameplay logic independent of React, Canvas and browser APIs wherever practical.
 - World units equal grid cells. Straights have length 1; quarter-curves have radius 0.5 and length π/4.
 - Endpoint connections require matching positions within 10⁻⁶ and opposing outward tangents. Nearby drawings alone never constitute a connection.
-- Preserve integer cell placement, board bounds and the one-track-per-cell constraint. Future multi-cell pieces need explicit footprint validation.
-- Build the network after construction changes, never on every animation frame.
+- Preserve integer placement, board bounds and non-overlapping full footprints. Switches occupy two rotated cells; retain anchor offsets when dragging the second cell.
+- Crossings have two independent paths; never connect perpendicular routes. Switches expose only their active path. Reverse traversal requires alignment.
+- Switch controls use the live train ref and protect the engine body including nose/tail overhang. Never change points under an occupied train.
+- Build the network after construction or alignment changes, never on every animation frame.
 - Advance trains by distance and delta time over the real graph. Preserve overshoot and correct entry direction at transitions. Never jump to an unrelated segment.
 - Stop safely at open ends. Allow only one locomotive until a tested occupancy/collision system exists.
 - Keep track editing locked in Drive mode. Track removal and history restoration must revalidate the train’s starting segment **and distance against the restored path length**, including reused IDs after loading.
@@ -61,7 +63,7 @@ Do not run `next dev` and `next build` concurrently against the same `.next` dir
 ## Saving and history
 
 - Keep saves versioned and validate types, IDs, coordinates, rotations, duplicate cells and train position before applying them.
-- Maintain compatibility with existing version 1 layouts or implement and test an explicit migration.
+- Write version 2 with path IDs, switch alignment and provenance; migrate version 1 safely. Preserve unmarked legacy layouts. Only records explicitly marked auto-demo may start empty without loading their tracks; preserve their storage until explicit replacement.
 - On a corrupt record at startup **or manual Load**, preserve the current playable board and suspend autosaving. Replace the record only following an explicit Save, sample load or new-board action.
 - Storage failures must not prevent playing. Never commit credentials or private browser data.
 - Keep construction updates immutable and preserve undo/redo semantics; a new edit clears redo.

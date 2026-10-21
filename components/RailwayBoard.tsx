@@ -14,7 +14,11 @@ import type {
   Network,
   TrainState,
   TrainKind,
+  TrackType,
+  PathId,
 } from "@/lib/railway/types";
+import { trackAtCell } from "@/lib/railway/footprints";
+import { isSwitch, nearestActivePath } from "@/lib/railway/geometry";
 import { canPlace } from "@/lib/railway/editor";
 import { advanceTrain } from "@/lib/railway/simulation";
 import {
@@ -30,7 +34,7 @@ export type BoardHandle = {
     pointerId: number,
     x: number,
     y: number,
-    type: "straight" | "curve",
+    type: TrackType,
   ) => void;
 };
 type Props = {
@@ -45,7 +49,7 @@ type Props = {
   onSelect: (id: string | null) => void;
   onPlace: (track: Track) => void;
   onMove: (track: Track) => void;
-  onTrainPlace: (track: Track) => void;
+  onTrainPlace: (track: Track, pathId?: PathId) => void;
   onSimulation: (state: TrainState | null) => void;
   onEnded: () => void;
   onWheelSound: () => void;
@@ -62,8 +66,9 @@ type Gesture = {
   sy: number;
   camera: Camera;
   track?: Track;
-  type?: "straight" | "curve";
+  type?: TrackType;
   moved: boolean;
+  grab?: { x: number; y: number };
 };
 export const RailwayBoard = forwardRef<BoardHandle, Props>(
   function RailwayBoard(props, ref) {
@@ -118,6 +123,9 @@ export const RailwayBoard = forwardRef<BoardHandle, Props>(
       const resize = () => {
         const rect = el.getBoundingClientRect(),
           old = size.current;
+        // Layout transitions can briefly hide the board. Keep its drawable buffer
+        // and camera until ResizeObserver reports a usable size again.
+        if (rect.width <= 0 || rect.height <= 0) return;
         size.current = { w: rect.width, h: rect.height };
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         c.width = Math.round(rect.width * dpr);
@@ -158,17 +166,20 @@ export const RailwayBoard = forwardRef<BoardHandle, Props>(
           inside: x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
         };
       };
+      const isTrackTool = (tool: Tool): tool is TrackType =>
+        tool !== "select" && tool !== "pan" && tool !== "train";
       const candidate = (x: number, y: number, g?: Gesture | null): Track => {
         const cell = hit(x, y),
           p = latest.current;
         return {
+          ...g?.track,
           id: g?.track?.id || "ghost",
           type:
             g?.track?.type ||
             g?.type ||
-            (p.tool === "curve" ? "curve" : "straight"),
-          x: cell.x,
-          y: cell.y,
+            (isTrackTool(p.tool) ? p.tool : "straight"),
+          x: cell.x - (g?.grab?.x || 0),
+          y: cell.y - (g?.grab?.y || 0),
           rotation: g?.track?.rotation ?? p.rotation,
         };
       };
@@ -194,7 +205,7 @@ export const RailwayBoard = forwardRef<BoardHandle, Props>(
             ghost.current = hit(e.clientX, e.clientY).inside
               ? candidate(e.clientX, e.clientY, g)
               : null;
-        } else if (!p.driving && (p.tool === "straight" || p.tool === "curve"))
+        } else if (!p.driving && isTrackTool(p.tool))
           ghost.current = hit(e.clientX, e.clientY).inside
             ? candidate(e.clientX, e.clientY)
             : null;
@@ -206,11 +217,25 @@ export const RailwayBoard = forwardRef<BoardHandle, Props>(
         ghost.current = null;
         const p = latest.current,
           cell = hit(e.clientX, e.clientY);
-        if (!cell.inside || g.kind === "pan") return;
+        if (!cell.inside) return;
+        if (g.kind === "pan") {
+          if (p.driving && !g.moved && g.track && isSwitch(g.track))
+            p.onSelect(g.track.id);
+          return;
+        }
         if (g.kind === "train") {
-          const t = p.tracks.find((t) => t.x === cell.x && t.y === cell.y);
-          if (t) p.onTrainPlace(t);
-          else p.onFeedback("Tap a track to place your engine.");
+          const t = trackAtCell(p.tracks, cell.x, cell.y);
+          if (t) {
+            const r = el.getBoundingClientRect(),
+              c = cameraRef.current;
+            p.onTrainPlace(
+              t,
+              nearestActivePath(t, {
+                x: (e.clientX - r.left - c.ox) / c.scale,
+                y: (e.clientY - r.top - c.oy) / c.scale,
+              }),
+            );
+          } else p.onFeedback("Tap a track to place your engine.");
           return;
         }
         if (p.driving) return;
@@ -235,7 +260,7 @@ export const RailwayBoard = forwardRef<BoardHandle, Props>(
         el.setPointerCapture(e.pointerId);
         const p = latest.current,
           cell = hit(e.clientX, e.clientY),
-          track = p.tracks.find((t) => t.x === cell.x && t.y === cell.y);
+          track = trackAtCell(p.tracks, cell.x, cell.y);
         const kind =
           e.button === 1 || e.shiftKey || p.tool === "pan"
             ? "pan"
@@ -257,7 +282,14 @@ export const RailwayBoard = forwardRef<BoardHandle, Props>(
           sx: e.clientX,
           sy: e.clientY,
           camera: cameraRef.current,
-          track: kind === "move" ? track : undefined,
+          track:
+            kind === "move" || (p.driving && track && isSwitch(track))
+              ? track
+              : undefined,
+          grab:
+            kind === "move" && track
+              ? { x: cell.x - track.x, y: cell.y - track.y }
+              : undefined,
           moved: false,
         };
         if (kind === "place") ghost.current = candidate(e.clientX, e.clientY);

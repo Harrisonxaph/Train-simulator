@@ -1,9 +1,23 @@
-import type { SavedLayout, Track, StartPosition } from "./types";
+import type {
+  SavedLayout,
+  Track,
+  StartPosition,
+  TrackType,
+  PathId,
+} from "./types";
 import { canPlace } from "./editor";
-import { pathLength } from "./geometry";
-export const SAVE_KEY = "little-railways-v1";
+import { isSwitch } from "./geometry";
+import { revalidateStart } from "./simulation";
+export const SAVE_KEY = "little-railways-v1"; // Retain the key so existing players' V1 layouts are discovered.
+const trackTypes: TrackType[] = [
+  "straight",
+  "curve",
+  "crossing",
+  "switch-left",
+  "switch-right",
+];
 function invalid(): never {
-  throw new Error(
+  throw Error(
     "This saved railway could not be read. Your current board is safe.",
   );
 }
@@ -19,12 +33,14 @@ export function decodeSave(raw: string): SavedLayout {
   }
   if (
     !object(s) ||
-    s.version !== 1 ||
+    (s.version !== 1 && s.version !== 2) ||
     !Array.isArray(s.tracks) ||
     s.tracks.length > 400 ||
     !["steam", "diesel", "electric"].includes(s.trainKind as string) ||
     typeof s.muted !== "boolean"
   )
+    return invalid();
+  if (s.version === 2 && s.source !== "user" && s.source !== "auto-demo")
     return invalid();
   const tracks: Track[] = [],
     ids = new Set<string>();
@@ -32,10 +48,11 @@ export function decodeSave(raw: string): SavedLayout {
     if (
       !object(v) ||
       typeof v.id !== "string" ||
-      v.id.length < 1 ||
+      !v.id.length ||
       v.id.length > 100 ||
       ids.has(v.id) ||
-      (v.type !== "straight" && v.type !== "curve") ||
+      !trackTypes.includes(v.type as TrackType) ||
+      (s.version === 1 && v.type !== "straight" && v.type !== "curve") ||
       !Number.isInteger(v.rotation) ||
       Number(v.rotation) < 0 ||
       Number(v.rotation) > 3 ||
@@ -45,11 +62,16 @@ export function decodeSave(raw: string): SavedLayout {
       return invalid();
     const t: Track = {
       id: v.id,
-      type: v.type,
+      type: v.type as TrackType,
       x: v.x,
       y: v.y,
       rotation: v.rotation as Track["rotation"],
     };
+    if (isSwitch(t)) {
+      if (v.switchState !== "straight" && v.switchState !== "branch")
+        return invalid();
+      t.switchState = v.switchState;
+    }
     if (!canPlace(tracks, t)) return invalid();
     tracks.push(t);
     ids.add(t.id);
@@ -65,24 +87,31 @@ export function decodeSave(raw: string): SavedLayout {
       (v.direction !== 1 && v.direction !== -1)
     )
       return invalid();
-    const t = tracks.find((t) => t.id === v.pieceId);
-    if (!t || v.distance < 0 || v.distance > pathLength(t)) return invalid();
-    start = {
-      pieceId: v.pieceId,
-      distance: v.distance,
-      direction: v.direction,
-    };
+    const pathId = s.version === 1 ? "main" : v.pathId;
+    if (pathId !== "main" && pathId !== "cross" && pathId !== "branch")
+      return invalid();
+    start = revalidateStart(
+      {
+        pieceId: v.pieceId,
+        pathId: pathId as PathId,
+        distance: v.distance,
+        direction: v.direction,
+      },
+      tracks,
+    );
+    if (!start) return invalid();
   }
   return {
-    version: 1,
+    version: 2,
+    source: s.source === "auto-demo" ? "auto-demo" : "user",
     tracks,
     trainKind: s.trainKind as SavedLayout["trainKind"],
     start,
     muted: s.muted,
   };
 }
-export function encodeSave(s: SavedLayout): string {
-  const raw = JSON.stringify(s);
+export function encodeSave(layout: SavedLayout): string {
+  const raw = JSON.stringify(layout);
   decodeSave(raw);
   return raw;
 }
