@@ -1,0 +1,236 @@
+{
+  "version": 1,
+  "tracks": [
+    {
+      "id": "sample-0",
+      "type": "curve",
+      "x": 5,
+      "y": 6,
+      "rotation": 3
+    },
+    {
+      "id": "sample-1",
+      "type": "straight",
+      "x": 6,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-2",
+      "type": "straight",
+      "x": 7,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-3",
+      "type": "straight",
+      "x": 8,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-4",
+      "type": "straight",
+      "x": 9,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-5",
+      "type": "straight",
+      "x": 10,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-6",
+      "type": "straight",
+      "x": 11,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-7",
+      "type": "straight",
+      "x": 12,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-8",
+      "type": "straight",
+      "x": 13,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-9",
+      "type": "curve",
+      "x": 14,
+      "y": 6,
+      "rotation": 0
+    },
+    {
+      "id": "sample-10",
+      "type": "straight",
+      "x": 14,
+      "y": 7,
+      "rotation": 1
+    },
+    {
+      "id": "sample-11",
+      "type": "straight",
+      "x": 14,
+      "y": 8,
+      "rotation": 1
+    },
+    {
+      "id": "sample-12",
+      "type": "straight",
+      "x": 14,
+      "y": 9,
+      "rotation": 1
+    },
+    {
+      "id": "sample-13",
+      "type": "straight",
+      "x": 14,
+      "y": 10,
+      "rotation": 1
+    },
+    {
+      "id": "sample-14",
+      "type": "straight",
+      "x": 14,
+      "y": 11,
+      "rotation": 1
+    },
+    {
+      "id": "sample-15",
+      "type": "straight",
+      "x": 14,
+      "y": 12,
+      "rotation": 1
+    },
+    {
+      "id": "sample-16",
+      "type": "curve",
+      "x": 14,
+      "y": 13,
+      "rotation": 1
+    },
+    {
+      "id": "sample-17",
+      "type": "straight",
+      "x": 13,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-18",
+      "type": "straight",
+      "x": 12,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-19",
+      "type": "straight",
+      "x": 11,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-20",
+      "type": "straight",
+      "x": 10,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-21",
+      "type": "straight",
+      "x": 9,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-22",
+      "type": "straight",
+      "x": 8,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-23",
+      "type": "straight",
+      "x": 7,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-24",
+      "type": "straight",
+      "x": 6,
+      "y": 13,
+      "rotation": 0
+    },
+    {
+      "id": "sample-25",
+      "type": "curve",
+      "x": 5,
+      "y": 13,
+      "rotation": 2
+    },
+    {
+      "id": "sample-26",
+      "type": "straight",
+      "x": 5,
+      "y": 12,
+      "rotation": 1
+    },
+    {
+      "id": "sample-27",
+      "type": "straight",
+      "x": 5,
+      "y": 11,
+      "rotation": 1
+    },
+    {
+      "id": "sample-28",
+      "type": "straight",
+      "x": 5,
+      "y": 10,
+      "rotation": 1
+    },
+    {
+      "id": "sample-29",
+      "type": "straight",
+      "x": 5,
+      "y": 9,
+      "rotation": 1
+    },
+    {
+      "id": "sample-30",
+      "type": "straight",
+      "x": 5,
+      "y": 8,
+      "rotation": 1
+    },
+    {
+      "id": "sample-31",
+      "type": "straight",
+      "x": 5,
+      "y": 7,
+      "rotation": 1
+    }
+  ],
+  "trainKind": "steam",
+  "start": {
+    "pieceId": "sample-2",
+    "distance": 0.5,
+    "direction": 1
+  },
+  "muted": false
+}
