@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { drawTrack, drawLocomotive } from "@/lib/rendering";
-import type { TrainKind } from "@/lib/railway/types";
+import { footprintBounds } from "@/lib/railway/footprints";
+import type { TrainKind, TrackType } from "@/lib/railway/types";
 export function TrackPreview({
   type,
   rotation = 0,
 }: {
-  type: "straight" | "curve";
+  type: TrackType;
   rotation?: 0 | 1 | 2 | 3;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -15,9 +16,27 @@ export function TrackPreview({
       ctx = c.getContext("2d")!;
     ctx.clearRect(0, 0, 144, 100);
     ctx.save();
-    ctx.translate(35, 12);
-    ctx.scale(76, 76);
-    drawTrack(ctx, { id: "preview", type, x: 0, y: 0, rotation });
+    const track = {
+      id: "preview",
+      type,
+      x: 0,
+      y: 0,
+      rotation,
+      switchState: "straight" as const,
+    };
+    const b = footprintBounds(track);
+    if (b.width === 1 && b.height === 1) {
+      ctx.translate(35, 12);
+      ctx.scale(76, 76);
+    } else {
+      const scale = Math.min(112 / b.width, 76 / b.height);
+      ctx.translate(
+        72 - (b.x + b.width / 2) * scale,
+        50 - (b.y + b.height / 2) * scale,
+      );
+      ctx.scale(scale, scale);
+    }
+    drawTrack(ctx, track);
     ctx.restore();
   }, [type, rotation]);
   return (

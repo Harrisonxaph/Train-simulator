@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
-import type { Track, Tool } from "@/lib/railway/types";
+import type { Track, Tool, TrackType, PathId } from "@/lib/railway/types";
+import { activePaths } from "@/lib/railway/geometry";
+import { trackAtCell } from "@/lib/railway/footprints";
 import { Icon } from "./Icon";
 import { TrackPreview } from "./TrackPreview";
 type Props = {
@@ -10,19 +12,14 @@ type Props = {
   selected: string | null;
   tracks: Track[];
   selectTool: (t: Tool) => void;
-  paletteStart: (
-    id: number,
-    x: number,
-    y: number,
-    type: "straight" | "curve",
-  ) => void;
+  paletteStart: (id: number, x: number, y: number, type: TrackType) => void;
   pan: () => void;
   rotate: () => void;
   remove: () => void;
   sample: () => void;
   setSelected: (id: string | null) => void;
   setFeedback: (s: string) => void;
-  placeTrain: (t: Track) => void;
+  placeTrain: (t: Track, pathId?: PathId) => void;
   place: (t: Track) => void;
   move: (t: Track) => void;
 };
@@ -45,7 +42,9 @@ export function BuildingBox({
   move,
 }: Props) {
   const [gridX, setGridX] = useState(10),
-    [gridY, setGridY] = useState(10);
+    [gridY, setGridY] = useState(10),
+    [placementPath, setPlacementPath] = useState<PathId>("main");
+  const gridTrack = trackAtCell(tracks, gridX - 1, gridY - 1);
   return (
     <section
       className={`building-box ${mode === "drive" ? "locked" : ""}`}
@@ -67,58 +66,58 @@ export function BuildingBox({
         </span>
       </div>
       <div className="tools-row">
-        <button
-          className={`piece-tool ${tool === "straight" && mode === "build" ? "selected" : ""}`}
-          aria-label="Straight track"
-          aria-pressed={tool === "straight" && mode === "build"}
-          disabled={mode === "drive"}
-          onPointerDown={(e) => {
-            if (mode === "drive") return;
-            selectTool("straight");
-            e.currentTarget.setPointerCapture(e.pointerId);
-            paletteStart(e.pointerId, e.clientX, e.clientY, "straight");
-          }}
-          onClick={() => selectTool("straight")}
-        >
-          <TrackPreview
-            type="straight"
-            rotation={tool === "straight" ? rotation : 0}
-          />
-          <span>
-            Straight <small>KEEP GOING</small>
-          </span>
-          {tool === "straight" && mode === "build" && (
-            <i>
-              <Icon name="check" size={11} />
-            </i>
-          )}
-        </button>
-        <button
-          className={`piece-tool ${tool === "curve" && mode === "build" ? "selected" : ""}`}
-          aria-label="Curve track"
-          aria-pressed={tool === "curve" && mode === "build"}
-          disabled={mode === "drive"}
-          onPointerDown={(e) => {
-            if (mode === "drive") return;
-            selectTool("curve");
-            e.currentTarget.setPointerCapture(e.pointerId);
-            paletteStart(e.pointerId, e.clientX, e.clientY, "curve");
-          }}
-          onClick={() => selectTool("curve")}
-        >
-          <TrackPreview
-            type="curve"
-            rotation={tool === "curve" ? rotation : 0}
-          />
-          <span>
-            Curve <small>A NEW DIRECTION</small>
-          </span>
-          {tool === "curve" && mode === "build" && (
-            <i>
-              <Icon name="check" size={11} />
-            </i>
-          )}
-        </button>
+        <div className="track-palette" role="group" aria-label="Track pieces">
+          {(
+            [
+              { type: "straight", name: "Straight", caption: "KEEP GOING" },
+              { type: "curve", name: "Curve", caption: "A NEW DIRECTION" },
+              {
+                type: "crossing",
+                name: "Crossing",
+                caption: "STRAIGHT ACROSS",
+              },
+              {
+                type: "switch-left",
+                name: "Left switch",
+                caption: "CHOOSE YOUR WAY",
+              },
+              {
+                type: "switch-right",
+                name: "Right switch",
+                caption: "CHOOSE YOUR WAY",
+              },
+            ] as const
+          ).map((piece) => (
+            <button
+              key={piece.type}
+              className={`piece-tool ${tool === piece.type && mode === "build" ? "selected" : ""}`}
+              aria-label={`${piece.name} track`}
+              aria-pressed={tool === piece.type && mode === "build"}
+              disabled={mode === "drive"}
+              onPointerDown={(e) => {
+                if (mode === "drive") return;
+                selectTool(piece.type);
+                e.currentTarget.setPointerCapture(e.pointerId);
+                paletteStart(e.pointerId, e.clientX, e.clientY, piece.type);
+              }}
+              onClick={() => selectTool(piece.type)}
+            >
+              <TrackPreview
+                type={piece.type}
+                rotation={tool === piece.type ? rotation : 0}
+              />
+              <span>
+                {piece.name}
+                <small>{piece.caption}</small>
+              </span>
+              {tool === piece.type && mode === "build" && (
+                <i>
+                  <Icon name="check" size={11} />
+                </i>
+              )}
+            </button>
+          ))}
+        </div>
         <div className="tool-separator" />
         <div className="small-tools">
           <button
@@ -194,14 +193,25 @@ export function BuildingBox({
               onChange={(e) => setGridY(Number(e.target.value))}
             />
           </label>
+          {tool === "train" && gridTrack?.type === "crossing" && (
+            <label>
+              Train route{" "}
+              <select
+                aria-label="Train route"
+                value={placementPath === "cross" ? "cross" : "main"}
+                onChange={(e) => setPlacementPath(e.target.value as PathId)}
+              >
+                <option value="main">Across</option>
+                <option value="cross">Up / down</option>
+              </select>
+            </label>
+          )}
           <button
             disabled={mode === "drive" && tool !== "train"}
             onClick={() => {
-              const t = tracks.find(
-                (t) => t.x === gridX - 1 && t.y === gridY - 1,
-              );
+              const t = trackAtCell(tracks, gridX - 1, gridY - 1);
               if (tool === "train") {
-                if (t) placeTrain(t);
+                if (t) placeTrain(t, placementPath);
                 else setFeedback("Choose a square with track for your engine.");
               } else if (tool === "select") {
                 setSelected(t?.id || null);
@@ -213,7 +223,7 @@ export function BuildingBox({
               } else
                 place({
                   id: "grid",
-                  type: tool === "curve" ? "curve" : "straight",
+                  type: tool !== "pan" ? tool : "straight",
                   x: gridX - 1,
                   y: gridY - 1,
                   rotation,

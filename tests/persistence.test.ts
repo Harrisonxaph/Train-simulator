@@ -3,10 +3,11 @@ import { encodeSave, decodeSave } from "../lib/railway/persistence";
 import { sampleLayout } from "../lib/railway/sample";
 import type { SavedLayout } from "../lib/railway/types";
 const saved = (): SavedLayout => ({
-  version: 1,
+  version: 2,
+  source:"user",
   tracks: sampleLayout(),
   trainKind: "steam",
-  start: { pieceId: "sample-0", distance: 0.4, direction: 1 },
+  start: { pathId:"main",pieceId: "sample-0", distance: 0.4, direction: 1 },
   muted: false,
 });
 it("round trips a versioned layout", () => {

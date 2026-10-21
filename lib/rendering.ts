@@ -4,10 +4,20 @@ import type {
   TrainKind,
   TrainState,
   Network,
+  PathId,
 } from "./railway/types";
-import { endpoints, pathLength, samplePath } from "./railway/geometry";
+import {
+  endpoints,
+  pathLength,
+  samplePath,
+  paths,
+  activePaths,
+  isSwitch,
+  rotatePoint,
+} from "./railway/geometry";
 import { trainPose } from "./railway/simulation";
 import { endpointKey, compatible } from "./railway/network";
+import { footprint, footprintBounds } from "./railway/footprints";
 type C = CanvasRenderingContext2D;
 function round(
   ctx: C,
@@ -34,30 +44,36 @@ function circle(ctx: C, x: number, y: number, r: number, fill: string) {
   ctx.fillStyle = fill;
   ctx.fill();
 }
-function path(ctx: C, t: Track, offset = 0) {
-  const length = pathLength(t),
-    steps = t.type === "curve" ? 18 : 1;
+function path(ctx: C, t: Track, offset = 0, pathId: PathId = "main") {
+  const length = pathLength(t, pathId),
+    steps =
+      t.type === "curve" ? 18 : isSwitch(t) && pathId === "branch" ? 36 : 1;
   ctx.beginPath();
   for (let i = 0; i <= steps; i++) {
-    const p = samplePath(t, (length * i) / steps);
+    const p = samplePath(t, (length * i) / steps, pathId);
     const x = p.x - Math.sin(p.heading) * offset,
       y = p.y + Math.cos(p.heading) * offset;
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
 }
-export function drawTrack(ctx: C, t: Track, ghost = false) {
+function drawRailPath(
+  ctx: C,
+  t: Track,
+  ghost = false,
+  pathId: PathId = "main",
+) {
   ctx.save();
   if (ghost) ctx.globalAlpha = 0.6;
-  path(ctx, t);
+  path(ctx, t, 0, pathId);
   ctx.lineCap = "butt";
   ctx.strokeStyle = "#60875755";
   ctx.lineWidth = 0.58;
   ctx.stroke();
-  const length = pathLength(t),
-    count = t.type === "curve" ? 6 : 7;
+  const length = pathLength(t, pathId),
+    count = t.type === "curve" ? 6 : Math.ceil(length * 7);
   for (let i = 0; i < count; i++) {
-    const p = samplePath(t, (length * (i + 0.5)) / count);
+    const p = samplePath(t, (length * (i + 0.5)) / count, pathId);
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.heading);
@@ -71,16 +87,57 @@ export function drawTrack(ctx: C, t: Track, ghost = false) {
     ctx.restore();
   }
   for (const offset of [-0.155, 0.155]) {
-    path(ctx, t, offset);
+    path(ctx, t, offset, pathId);
     ctx.strokeStyle = "#435c59";
     ctx.lineWidth = 0.078;
     ctx.stroke();
-    path(ctx, t, offset - 0.012);
+    path(ctx, t, offset - 0.012, pathId);
     ctx.strokeStyle = "#e4e8da";
     ctx.lineWidth = 0.029;
     ctx.stroke();
   }
   ctx.restore();
+}
+export function drawTrack(ctx: C, t: Track, ghost = false) {
+  if (t.type === "straight" || t.type === "curve") {
+    drawRailPath(ctx, t, ghost);
+    return;
+  }
+  const active = activePaths(t)[0].id;
+  const ordered = paths(t).sort(
+    (a, b) => Number(a.id === active) - Number(b.id === active),
+  );
+  for (const p of ordered) {
+    ctx.save();
+    if (isSwitch(t) && p.id !== active) ctx.globalAlpha *= 0.42;
+    drawRailPath(ctx, t, ghost, p.id);
+    ctx.restore();
+  }
+  if (isSwitch(t)) {
+    const p = rotatePoint(0.72, 0.5, t.rotation);
+    ctx.save();
+    ctx.translate(t.x + p.x, t.y + p.y);
+    ctx.rotate((t.rotation * Math.PI) / 2);
+    ctx.strokeStyle = "#d2b874";
+    ctx.lineWidth = 0.045;
+    ctx.beginPath();
+    ctx.moveTo(-0.13, 0);
+    ctx.lineTo(
+      0.12,
+      t.switchState === "branch"
+        ? t.type === "switch-left"
+          ? -0.12
+          : 0.12
+        : 0,
+    );
+    ctx.stroke();
+    circle(ctx, -0.13, 0, 0.045, "#486950");
+    ctx.restore();
+  }
+  if (t.type === "crossing")
+    for (const x of [0.35, 0.65])
+      for (const y of [0.35, 0.65])
+        circle(ctx, t.x + x, t.y + y, 0.025, "#b2b39a");
 }
 function tree(ctx: C, x: number, y: number, size = 1) {
   ctx.save();
@@ -126,9 +183,9 @@ function terrain(ctx: C, tracks: Track[]) {
     ctx.fillRect(x, y, 0.025 + random() * 0.025, 0.025);
   }
   const clear = (x: number, y: number, r = 1) =>
-    !tracks.some(
-      (t) => Math.abs(t.x + 0.5 - x) < r && Math.abs(t.y + 0.5 - y) < r,
-    );
+    !tracks
+      .flatMap(footprint)
+      .some((t) => Math.abs(t.x + 0.5 - x) < r && Math.abs(t.y + 0.5 - y) < r);
   // Background details fade out near constructed track; they never participate in the graph.
   if (clear(10.3, 10, 1.6)) {
     ctx.save();
@@ -282,12 +339,13 @@ export function renderBoard(ctx: C, o: RenderOptions) {
   terrain(ctx, tracks);
   for (const t of tracks) {
     if (t.id === o.selected) {
+      const b = footprintBounds(t);
       round(
         ctx,
-        t.x + 0.02,
-        t.y + 0.02,
-        0.96,
-        0.96,
+        b.x + 0.02,
+        b.y + 0.02,
+        b.width - 0.04,
+        b.height - 0.04,
         0.12,
         "#fff7d366",
         "#f8f1bf",
@@ -317,13 +375,14 @@ export function renderOverlay(ctx: C, o: RenderOptions) {
   ctx.scale(camera.scale, camera.scale);
   if (o.ghost) {
     const t = o.ghost;
+    const b = footprintBounds(t);
     ctx.lineWidth = 0.045;
     round(
       ctx,
-      t.x + 0.02,
-      t.y + 0.02,
-      0.96,
-      0.96,
+      b.x + 0.02,
+      b.y + 0.02,
+      b.width - 0.04,
+      b.height - 0.04,
       0.1,
       o.valid ? "#f8f8d46b" : "#eaa5a575",
       o.valid ? "#fffce5" : "#b8564e",

@@ -7,10 +7,19 @@ import type {
   TrainState,
   StartPosition,
   Tool,
+  PathId,
+  SwitchState,
 } from "@/lib/railway/types";
+import {
+  initialRailway,
+  canAddTrain,
+  EMPTY_MESSAGE,
+  NO_TRACK_MESSAGE,
+  loadStartup,
+} from "@/lib/railway/startup";
 import { sampleLayout } from "@/lib/railway/sample";
-import { buildNetwork } from "@/lib/railway/network";
-import { pathLength } from "@/lib/railway/geometry";
+import { buildNetwork, loopLengthFor } from "@/lib/railway/network";
+import { isSwitch, activePaths, pathLength } from "@/lib/railway/geometry";
 import {
   canPlace,
   initialHistory,
@@ -19,8 +28,9 @@ import {
   redo,
   type History,
 } from "@/lib/railway/editor";
-import { createTrain } from "@/lib/railway/simulation";
+import { createTrain, revalidateStart } from "@/lib/railway/simulation";
 import { decodeSave, encodeSave, SAVE_KEY } from "@/lib/railway/persistence";
+import { changeSwitchRoute, switchOccupied } from "@/lib/railway/switches";
 import { RailwayAudio } from "@/lib/audio";
 import { RailwayBoard, type BoardHandle } from "./RailwayBoard";
 import { Icon, type IconName } from "./Icon";
@@ -28,6 +38,7 @@ import { BuildingBox } from "./BuildingBox";
 import { ConductorPanel } from "./ConductorPanel";
 const defaultStart: StartPosition = {
   pieceId: "sample-2",
+  pathId: "main",
   distance: 0.5,
   direction: 1,
 };
@@ -56,7 +67,7 @@ function IconButton({
 }
 export default function RailwayGame() {
   const [history, setHistory] = useState<History>(() =>
-    initialHistory(sampleLayout()),
+    initialHistory(initialRailway().tracks),
   );
   const tracks = history.present;
   const network = useMemo(() => buildNetwork(tracks), [tracks]);
@@ -65,16 +76,14 @@ export default function RailwayGame() {
     [rotation, setRotation] = useState<Track["rotation"]>(0),
     [selected, setSelected] = useState<string | null>(null);
   const [kind, setKind] = useState<TrainKind>("steam"),
-    [start, setStart] = useState<StartPosition | null>(defaultStart),
+    [start, setStart] = useState<StartPosition | null>(null),
     [muted, setMuted] = useState(false),
     [speed, setSpeed] = useState(2);
-  const trainRef = useRef<TrainState | null>(createTrain(defaultStart)),
+  const trainRef = useRef<TrainState | null>(null),
     [trainStatus, setTrainStatus] = useState<TrainState | null>(
       trainRef.current,
     );
-  const [feedback, setFeedback] = useState(
-      "A little railway, ready for its first adventure.",
-    ),
+  const [feedback, setFeedback] = useState(EMPTY_MESSAGE),
     [hydrated, setHydrated] = useState(false),
     [autoAllowed, setAutoAllowed] = useState(true),
     [saveStatus, setSaveStatus] = useState("Saved on this device");
@@ -82,7 +91,7 @@ export default function RailwayGame() {
     [tour, setTour] = useState<number | null>(null);
   const board = useRef<BoardHandle>(null),
     audio = useRef<RailwayAudio | null>(null),
-    previousLoops = useRef(1);
+    previousLoops = useRef(0);
   const getAudio = () => {
     audio.current ??= new RailwayAudio();
     audio.current.muted = muted;
@@ -113,14 +122,23 @@ export default function RailwayGame() {
       const raw = localStorage.getItem(SAVE_KEY);
       if (raw) {
         try {
-          const s = decodeSave(raw);
+          const restored = loadStartup(raw);
+          const s = restored.layout;
+          if (restored.protectRecord) {
+            setAutoAllowed(false);
+            setSaveStatus("Starter file preserved until Save");
+          }
           setHistory(initialHistory(s.tracks));
           setKind(s.trainKind);
           setStart(s.start);
           setMuted(s.muted);
           trainRef.current = s.start ? createTrain(s.start) : null;
           setTrainStatus(trainRef.current);
-          setFeedback("Welcome back, little conductor. Your railway is ready.");
+          setFeedback(
+            restored.protectRecord
+              ? EMPTY_MESSAGE
+              : "Welcome back, little conductor. Your railway is ready.",
+          );
         } catch {
           setAutoAllowed(false);
           setSaveStatus("Saved file needs a fresh start");
@@ -148,7 +166,14 @@ export default function RailwayGame() {
       try {
         localStorage.setItem(
           SAVE_KEY,
-          encodeSave({ version: 1, tracks, trainKind: kind, start, muted }),
+          encodeSave({
+            version: 2,
+            source: "user",
+            tracks,
+            trainKind: kind,
+            start,
+            muted,
+          }),
         );
         setSaveStatus("Saved on this device");
       } catch {
@@ -170,19 +195,9 @@ export default function RailwayGame() {
     setTrainStatus(state);
   };
   const resetForTracks = (next: Track[]) => {
-    const startTrack = start ? next.find((t) => t.id === start.pieceId) : null;
-    // History can restore a shorter geometry under an ID from an imported save.
-    if (
-      start &&
-      startTrack &&
-      start.distance >= 0 &&
-      start.distance <= pathLength(startTrack)
-    ) {
-      updateTrain(createTrain(start));
-    } else {
-      setStart(null);
-      updateTrain(null);
-    }
+    const valid = revalidateStart(start, next);
+    setStart(valid);
+    updateTrain(valid ? createTrain(valid) : null);
   };
   const edit = (next: Track[]) => {
     setHistory((h) => commit(h, next));
@@ -194,7 +209,13 @@ export default function RailwayGame() {
       setFeedback("Find an empty square on the grassy board.");
       return;
     }
-    const t = { ...candidate, id: crypto.randomUUID() };
+    const t: Track = {
+      ...candidate,
+      id: crypto.randomUUID(),
+      ...(isSwitch(candidate)
+        ? { switchState: candidate.switchState || "straight" }
+        : {}),
+    };
     const next = [...tracks, t];
     edit(next);
     const n = buildNetwork(next);
@@ -225,13 +246,15 @@ export default function RailwayGame() {
     if (selected) {
       const t = tracks.find((t) => t.id === selected);
       if (t) {
-        edit(
-          tracks.map((p) =>
-            p.id === selected
-              ? { ...p, rotation: ((p.rotation + 1) % 4) as Track["rotation"] }
-              : p,
-          ),
-        );
+        const rotated = {
+          ...t,
+          rotation: ((t.rotation + 1) % 4) as Track["rotation"],
+        };
+        if (!canPlace(tracks, rotated, t.id)) {
+          setFeedback("That turn needs a little more room.");
+          return;
+        }
+        edit(tracks.map((p) => (p.id === t.id ? rotated : p)));
         getAudio().place();
       }
     } else setRotation((r) => ((r + 1) % 4) as Track["rotation"]);
@@ -262,6 +285,10 @@ export default function RailwayGame() {
     );
   };
   const chooseEngine = (next: TrainKind) => {
+    if (!canAddTrain(tracks)) {
+      setFeedback(NO_TRACK_MESSAGE);
+      return;
+    }
     if (trainRef.current)
       updateTrain({ ...trainRef.current, running: false, speed: 0 });
     setKind(next);
@@ -271,10 +298,18 @@ export default function RailwayGame() {
     setFeedback("Tap a track to place your engine.");
     advanceTour(4);
   };
-  const placeTrain = (track: Track) => {
+  const placeTrain = (track: Track, requestedPath?: PathId) => {
+    if (!canAddTrain(tracks)) {
+      setFeedback(NO_TRACK_MESSAGE);
+      return;
+    }
+    const pathId =
+      activePaths(track).find((p) => p.id === requestedPath)?.id ||
+      activePaths(track)[0].id;
     const position: StartPosition = {
       pieceId: track.id,
-      distance: pathLength(track) / 2,
+      pathId,
+      distance: pathLength(track, pathId) / 2,
       direction: 1,
     };
     setStart(position);
@@ -284,20 +319,26 @@ export default function RailwayGame() {
     getAudio().place(true);
   };
   const play = () => {
-    if (!start || !trainRef.current) {
+    if (!tracks.length) {
+      setFeedback(NO_TRACK_MESSAGE);
+      return;
+    }
+    if (
+      !start ||
+      !trainRef.current ||
+      !revalidateStart(trainRef.current, tracks)
+    ) {
       setMode("drive");
       setTool("train");
       setFeedback("Choose an engine, then tap a track to place it.");
       return;
     }
-    const component = network.loops.find((c) =>
-      c.includes(trainRef.current!.pieceId),
+    const length = loopLengthFor(
+      network,
+      trainRef.current.pieceId,
+      trainRef.current.pathId || "main",
     );
-    const length = component
-      ? tracks
-          .filter((t) => component.includes(t.id))
-          .reduce((s, t) => s + pathLength(t), 0)
-      : 0;
+    const component = length > 0;
     updateTrain({
       ...trainRef.current,
       running: true,
@@ -337,7 +378,14 @@ export default function RailwayGame() {
     try {
       localStorage.setItem(
         SAVE_KEY,
-        encodeSave({ version: 1, tracks, trainKind: kind, start, muted }),
+        encodeSave({
+          version: 2,
+          source: "user",
+          tracks,
+          trainKind: kind,
+          start,
+          muted,
+        }),
       );
       setAutoAllowed(true);
       setSaveStatus("Saved on this device");
@@ -405,10 +453,39 @@ export default function RailwayGame() {
     if (mode === "drive") return;
     setSelected(null);
     setTool(t);
-    if (t === "straight" || t === "curve") {
+    if (t !== "select" && t !== "pan" && t !== "train") {
       if (t !== tool) setRotation(0);
       advanceTour(0);
     }
+  };
+  const selectedSwitch = tracks.find((t) => t.id === selected && isSwitch(t));
+  const switches = tracks.filter(isSwitch);
+  const occupied =
+    !!selectedSwitch &&
+    switchOccupied(selectedSwitch, trainRef.current, tracks);
+  const setAlignment = (alignment: SwitchState) => {
+    if (!selectedSwitch) return;
+    const result = changeSwitchRoute(
+      tracks,
+      selectedSwitch.id,
+      alignment,
+      trainRef.current,
+      start,
+    );
+    if (result.blocked) {
+      setFeedback("Wait until the train has passed!");
+      return;
+    }
+    if (result.tracks === tracks) return;
+    setHistory((h) => commit(h, result.tracks));
+    setStart(result.start);
+    updateTrain(result.train);
+    getAudio().place(true);
+    setFeedback(
+      alignment === "branch"
+        ? "Points set for the branch."
+        : "Points set straight ahead.",
+    );
   };
   return (
     <div className={`game-shell ${mode === "drive" ? "is-driving" : ""}`}>
@@ -581,6 +658,53 @@ export default function RailwayGame() {
                 {saveStatus}
               </span>
             </div>
+            {switches.length > 0 && (
+              <div
+                className="switch-controls"
+                aria-label="Railway switch controls"
+              >
+                <label>
+                  Switch direction{" "}
+                  <select
+                    aria-label="Switch to control"
+                    value={selectedSwitch?.id || ""}
+                    onChange={(e) => setSelected(e.target.value || null)}
+                  >
+                    <option value="">Select a switch</option>
+                    {switches.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.type === "switch-left" ? "Left" : "Right"} switch ·{" "}
+                        {t.x + 1}, {t.y + 1}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div role="group" aria-label="Switch alignment">
+                  <button
+                    aria-label="Switch straight"
+                    disabled={!selectedSwitch || occupied}
+                    aria-pressed={
+                      !!selectedSwitch &&
+                      selectedSwitch.switchState !== "branch"
+                    }
+                    onClick={() => setAlignment("straight")}
+                  >
+                    Straight
+                  </button>
+                  <button
+                    aria-label="Switch branch"
+                    disabled={!selectedSwitch || occupied}
+                    aria-pressed={selectedSwitch?.switchState === "branch"}
+                    onClick={() => setAlignment("branch")}
+                  >
+                    Branch
+                  </button>
+                </div>
+                {occupied && (
+                  <span role="note">Wait until the train has passed!</span>
+                )}
+              </div>
+            )}
             <BuildingBox
               mode={mode}
               tool={tool}
