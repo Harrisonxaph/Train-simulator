@@ -79,7 +79,7 @@ In restricted environments, set `PLAYWRIGHT_BROWSERS_PATH` to a writable directo
 - TypeScript checking and `next build` pass.
 - Browser acceptance covers creating an oval, detecting its loop, placing an engine, completing a lap, pausing, resetting, editing and saving. The pure simulator test continues for at least six laps.
 - V1 sample-animation QA observed approximately 60 frames/second in headless Chromium. V1.1 desktop/phone visual checks reported no runtime errors or horizontal page overflow; this is not a physical-device benchmark.
-- Both review findings in `docs/review.md` were reproduced failing before the fixes and pass in the final browser suite.
+- Both review findings in `docs/archive/review.md` were reproduced failing before the fixes and pass in the final browser suite.
 
 ## Architecture
 
@@ -119,3 +119,7 @@ For a future update, add station and long-track geometry using the existing mult
 ## Coding agents
 
 Read [AGENTS.md](./AGENTS.md) before changing the project. [agent.md](./agent.md) points to the same guide under the additionally requested filename.
+
+## Licence
+
+Released under the [MIT Licence](LICENSE). The locomotive sounds are synthesised in code; there are no third-party assets.

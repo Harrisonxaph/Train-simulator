@@ -43,7 +43,7 @@ Do not run `next dev` and `next build` concurrently against the same `.next` dir
 - `lib/railway/sample.ts`, `examples/meadow-loop.json`: sample oval and example save.
 - `lib/rendering.ts`, `lib/audio.ts`: procedural visuals and synthesised feedback.
 - `tests/`: Vitest railway logic tests. `e2e/`: Playwright acceptance tests.
-- `docs/`: approved design, implementation plan and release review notes.
+- `docs/`: approved design, implementation plan, track-safety notes and the agent workflow. `docs/archive/`: finished release progress ledgers and reviews. `docs/superpowers/`: v1.1 specs and plans.
 
 ## Railway invariants
 

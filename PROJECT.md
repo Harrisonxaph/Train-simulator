@@ -30,9 +30,9 @@ Vercel dashboard/production state is not verified by this workflow task.
 ## Existing approved design and evidence
 
 - [Original design](docs/design.md), [implementation plan](docs/implementation-plan.md)
-  and [release review](docs/review.md).
+  and [release review](docs/archive/review.md).
 - [V1.1 approved routing design](docs/superpowers/specs/2026-10-21-v1.1-track-routing-design.md)
-  and [progress ledger](docs/v1.1-progress.md).
+  and [progress ledger](docs/archive/v1.1-progress.md).
 - [Incomplete-track safety verification](docs/track-safety-verification.md).
 
 These already record detailed decisions and completed milestones. Historical

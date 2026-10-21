@@ -6,3 +6,4 @@ playwright-report
 test-results
 *.tsbuildinfo
 .superpowers
+__pycache__/
