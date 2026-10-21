@@ -5,7 +5,7 @@ Verified 2026-10-21, main `44cd95e`; no open PRs at audit.
 ## Completed (existing evidence)
 
 Milestones 1/2, selected polish and V1.1 routing are implemented. See
-[README release scope](README.md), [V1.1 progress](docs/v1.1-progress.md) and
+[README release scope](README.md), [V1.1 progress](docs/archive/v1.1-progress.md) and
 [track safety verification](docs/track-safety-verification.md) for actual work and
 historical test evidence. These documents remain the detailed milestone record.
 

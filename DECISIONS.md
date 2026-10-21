@@ -25,3 +25,11 @@ records the current geometry, switch-occupancy and persistence contracts.
   existing Actions workflow was present on audited main.
 - Affected: `.github/workflows/quality.yml`, workflow-only checker/tests.
 - Actual hosted results must be observed; a configured job is not a passing job.
+
+## 2026-10-22 — MIT licence, feature-named tests and archived release docs
+
+- Decision: the owner chose the MIT Licence for the code (LICENSE on main); the README states it, noting audio is synthesised so there are no third-party assets.
+- Decision: rename the `v1.1-*` unit tests and `e2e/v1.1.spec.ts` after the feature they cover (`footprints`, `persistence-migration`, `routing`, `startup`, `switches`, `track-routing`). Contents unchanged; Vitest and Playwright discover them by folder.
+- Decision: move finished progress ledgers and reviews (`progress.md`, `review.md`, `v1.1-progress.md`, `v1.1-review.md`) to `docs/archive/`; links in PROJECT.md, TASKS.md, README.md and AGENTS.md updated.
+- Not done: a separate CI workflow was dropped because `quality.yml` already runs the same checks on pull requests.
+- Affected: tests/, e2e/, docs/, README.md, PROJECT.md, TASKS.md, AGENTS.md, DECISIONS.md. No application code changed.
