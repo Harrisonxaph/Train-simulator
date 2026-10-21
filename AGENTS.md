@@ -87,3 +87,16 @@ Do not run `next dev` and `next build` concurrently against the same `.next` dir
 - Report actual commands/results and any verification limits. Update README when controls, commands, save format, scope or deployment instructions change.
 - Keep `node_modules`, `.next`, browser caches, test reports and local secrets out of Git. Commit the lockfile.
 - Deployments, pushes and external service changes require user authorization; follow any authorization already given in the session without asking again.
+
+## Shared context and handover
+
+AGENTS.md is authoritative for all coding assistants; the existing agent.md
+redirect is retained. Before work read [PROJECT.md](PROJECT.md),
+[TASKS.md](TASKS.md), [DECISIONS.md](DECISIONS.md) and
+[docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md). Check the branch, dirty files and
+open PRs, agree acceptance criteria and use a dedicated development branch.
+Preserve other agents' unmerged work. Keep credentials/private data out of source
+and logs. On completion run relevant checks, record failures/limitations, update
+material project decisions/task state, commit and push, then open a review PR.
+Give the next agent the exact pushed commit/branch and handover summary; uncommitted
+or unsynchronised work is not shared. Never merge or deploy production automatically.
