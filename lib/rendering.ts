@@ -400,8 +400,18 @@ export function renderOverlay(ctx: C, o: RenderOptions) {
   }
   if (o.train) {
     const p = trainPose(o.train, tracks);
-    if (p)
+    if (p) {
+      if (!o.train.running && o.train.stopReason === "end") {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 0.67, 0, Math.PI * 2);
+        ctx.strokeStyle = "#b58a3c";
+        ctx.lineWidth = 0.045;
+        ctx.setLineDash([0.12, 0.09]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       drawLocomotive(ctx, o.kind, p.x, p.y, p.heading, o.time, o.train.running);
+    }
   }
   ctx.restore();
 }

@@ -49,6 +49,10 @@ export class RailwayAudio {
       this.tone(660, 0.4, "sine", 0.04, 0.2);
     }
   }
+  brake() {
+    this.tone(240, 0.24, "triangle", 0.025);
+    this.tone(160, 0.3, "sine", 0.018, 0.06);
+  }
   celebrate() {
     [523, 659, 784, 1046].forEach((f, i) =>
       this.tone(f, 0.25, "sine", 0.045, i * 0.12),

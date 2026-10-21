@@ -165,6 +165,7 @@ export function ConductorPanel({
           aria-label="Train status"
           data-testid="train-status"
           data-piece={trainStatus?.pieceId || "none"}
+          data-stop-reason={trainStatus?.stopReason || "none"}
           data-path={trainStatus?.pathId || "main"}
           className="train-telemetry sr-only"
           data-position={

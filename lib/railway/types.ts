@@ -45,6 +45,7 @@ export type StartPosition = {
   direction: 1 | -1;
 };
 export type TrainState = StartPosition & {
+  stopReason?: "end" | "invalid";
   speed: number;
   targetSpeed: number;
   running: boolean;

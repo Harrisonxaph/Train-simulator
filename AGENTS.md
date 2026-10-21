@@ -55,6 +55,7 @@ Do not run `next dev` and `next build` concurrently against the same `.next` dir
 - Switch controls use the live train ref and protect the engine body including nose/tail overhang. Never change points under an occupied train.
 - Build the network after construction or alignment changes, never on every animation frame.
 - Advance trains by distance and delta time over the real graph. Preserve overshoot and correct entry direction at transitions. Never jump to an unrelated segment.
+- Brake along the active route before open ends and clamp at the endpoint if needed. Revalidate physical ports at transitions even when using a cached graph. Preserve a paused train’s actual pose across unrelated edits and extension; clear placement if its occupied geometry changes.
 - Stop safely at open ends. Allow only one locomotive until a tested occupancy/collision system exists.
 - Keep track editing locked in Drive mode. Track removal and history restoration must revalidate the train’s starting segment **and distance against the restored path length**, including reused IDs after loading.
 - Pause animation-time accumulation across hidden tabs; cancel interrupted pointer gestures without committing edits.
